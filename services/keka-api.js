@@ -168,20 +168,39 @@ export class KekaAPIClient {
   async postCandidateNote(jobId, candidateId, noteContent, tags = []) {
     await this.rateLimiter.acquire();
     try {
-      const body = { comments: noteContent };
-      if (tags && tags.length > 0) {
-        body.tags = tags;
+      const doRequest = async (requestTags) => {
+        const body = { comments: noteContent };
+        if (requestTags && requestTags.length > 0) {
+          body.tags = requestTags;
+        }
+        
+        const response = await this.fetchWithRetry(`${this.baseUrl}/v1/hire/jobs/${jobId}/candidate/${candidateId}/notes`, {
+          method: 'POST',
+          headers: await this.getHeaders(),
+          body: JSON.stringify(body)
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => '');
+          return { ok: false, status: response.status, statusText: response.statusText, errorText };
+        }
+        
+        return { ok: true, data: await response.json() };
+      };
+
+      let result = await doRequest(tags);
+
+      // Handle 409 Tag Validation Error by retrying without tags
+      if (!result.ok && result.status === 409 && result.errorText.includes('already exist')) {
+        console.warn(`Tags already exist for candidate ${candidateId}. Retrying without tags...`);
+        result = await doRequest([]);
       }
-      const response = await this.fetchWithRetry(`${this.baseUrl}/v1/hire/jobs/${jobId}/candidate/${candidateId}/notes`, {
-        method: 'POST',
-        headers: await this.getHeaders(),
-        body: JSON.stringify(body)
-      });
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
-        throw new Error(`Keka API Error: ${response.status} ${response.statusText || ''} - ${errorText}`);
+
+      if (!result.ok) {
+        throw new Error(`Keka API Error: ${result.status} ${result.statusText || ''} - ${result.errorText}`);
       }
-      return await response.json();
+
+      return result.data;
     } finally {
       await this.rateLimiter.release();
     }
