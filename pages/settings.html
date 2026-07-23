@@ -14,10 +14,10 @@
   </nav>
 
   <div class="container">
-    <div class="card glass">
-      <div class="card-header">
-        <h3 class="card-title">Keka API Configuration</h3>
-      </div>
+    <details class="card glass" open>
+      <summary class="card-header" style="cursor: pointer; list-style: none;">
+        <h3 class="card-title">Keka API Configuration ▾</h3>
+      </summary>
       <div class="form-group">
         <label>Keka Company Subdomain:</label>
         <input type="text" id="keka-company" class="input" placeholder="e.g. acmecorp">
@@ -34,12 +34,13 @@
         <button class="btn" id="btn-test-keka">Test Keka Connection</button>
         <span id="keka-test-status" style="font-size: 13px; align-self: center;"></span>
       </div>
-    </div>
-
-    <div class="card glass" style="margin-top: 16px;">
-      <div class="card-header">
-        <h3 class="card-title">AI Services Configuration</h3>
       </div>
+    </details>
+
+    <details class="card glass" style="margin-top: 16px;">
+      <summary class="card-header" style="cursor: pointer; list-style: none;">
+        <h3 class="card-title">AI Services Configuration ▾</h3>
+      </summary>
       
       <div style="padding: 16px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px;">
         <h4 style="margin-bottom: 12px;">Anthropic (Claude)</h4>
@@ -108,7 +109,7 @@
           <span id="gemini-test-status" style="font-size: 13px; align-self: center;"></span>
         </div>
       </div>
-    </div>
+    </details>
     
     <button class="btn primary" id="btn-save" style="margin-top: 16px;">Save Settings</button>
     <div id="status-msg" style="margin-top: 8px; font-size: 13px; text-align: center;"></div>

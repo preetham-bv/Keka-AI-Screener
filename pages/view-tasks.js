@@ -37,8 +37,8 @@ class ViewTasksPage {
             Array.from(activeContainer.children).forEach(child => {
               if (child.classList.contains('task-card') && !validActiveIds.includes(child.id)) child.remove();
             });
-            // Remove the 'No active tasks' message if present
-            const emptyMsg = activeContainer.querySelector('.empty-tasks-msg');
+            // Remove the 'No active tasks' message or 'Loading tasks...' message if present
+            const emptyMsg = activeContainer.querySelector('.empty-tasks-msg, #loading-tasks-msg, div[style*="Loading tasks"]');
             if (emptyMsg) emptyMsg.remove();
             
             for (const task of activeTasks) {
@@ -62,24 +62,15 @@ class ViewTasksPage {
 
             pastTasks.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
             
-            const groupedTasks = { today: [], thisWeek: [], older: [] };
+            const groupedTasks = { today: [], previous: [] };
             const today = new Date().toDateString();
-            
-            // Helper to check if date is this week
-            const isThisWeek = (date) => {
-              const now = new Date();
-              const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-              return date > weekAgo && date.toDateString() !== today;
-            };
 
             pastTasks.forEach(task => {
               const date = new Date(task.createdAt);
               if (date.toDateString() === today) {
                 groupedTasks.today.push(task);
-              } else if (isThisWeek(date)) {
-                groupedTasks.thisWeek.push(task);
               } else {
-                groupedTasks.older.push(task);
+                groupedTasks.previous.push(task);
               }
             });
 
@@ -101,8 +92,7 @@ class ViewTasksPage {
             };
 
             await renderGroup('Today', groupedTasks.today, 'today');
-            await renderGroup('This Week', groupedTasks.thisWeek, 'thisWeek');
-            await renderGroup('Older', groupedTasks.older, 'older');
+            await renderGroup('Previous', groupedTasks.previous, 'previous');
 
           } else {
             pastContainer.innerHTML = '<div class="empty-tasks-msg" style="text-align: center; color: var(--text-secondary); margin-top: 20px; font-style: italic; font-size: 13px;">No past tasks</div>';
@@ -182,11 +172,9 @@ class ViewTasksPage {
               </div>
               
               <div class="task-details ${isExpanded ? 'expanded' : ''}" id="details-${task.taskId}">
-                ${task.status === 'running' ? `
                   <div class="progress-wrapper" style="margin-top: 0; margin-bottom: 16px;">
                     <div class="progress-fill" style="width: ${status.progress.percentage}%"></div>
                   </div>
-                ` : ''}
                 
                 <h4 style="font-size: 13px; margin-bottom: 8px;">Worker Status Grid</h4>
                 <div class="candidate-list" style="padding: 0;">
