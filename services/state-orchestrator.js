@@ -27,6 +27,9 @@ export class StateOrchestrator {
     
     dbManager.addEventListener('candidate_updated', (event) => {
       const { taskId, record } = event.detail;
+      if (['failed', 'posted', 'completed'].includes(record.status)) {
+        this.updateTaskProgress(taskId).catch(err => console.error('Failed to update progress', err));
+      }
       this.enqueueCandidate(taskId, record);
     });
     
