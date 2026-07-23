@@ -90,7 +90,7 @@ async function handleParsePdf(candidateId) {
 
       if (pageText.trim().length < 20) {
         // Likely an image-based page. Use OCR.
-        const viewport = page.getViewport({ scale: 1.5 }); // Lower scale to save memory/speed up
+        const viewport = page.getViewport({ scale: 1.2 }); // Lower scale to 1.2 to reduce memory footprint and speed up parsing
         const canvas = document.createElement('canvas');
         canvas.width = viewport.width;
         canvas.height = viewport.height;

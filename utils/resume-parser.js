@@ -94,6 +94,35 @@ export class ResumeParser {
   }
 
   /**
+   * Helper function to send message to offscreen document with timeout
+   */
+  static async sendMessageWithTimeout(message, timeoutMs = 120000) {
+    return new Promise((resolve, reject) => {
+      let isSettled = false;
+      const timeoutId = setTimeout(() => {
+        if (!isSettled) {
+          isSettled = true;
+          // Attempt to reset offscreen document state by closing it
+          chrome.offscreen.closeDocument().catch(() => {});
+          reject(new Error(`Parsing timed out after ${timeoutMs / 1000} seconds. The background parser might have crashed.`));
+        }
+      }, timeoutMs);
+
+      chrome.runtime.sendMessage(message, (response) => {
+        if (!isSettled) {
+          isSettled = true;
+          clearTimeout(timeoutId);
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else {
+            resolve(response);
+          }
+        }
+      });
+    });
+  }
+
+  /**
    * Parse PDF using offscreen document
    */
   static async parsePdf(arrayBuffer, candidateId) {
@@ -102,11 +131,11 @@ export class ResumeParser {
     }
 
     await setupOffscreenDocument('pages/offscreen.html');
-    const response = await chrome.runtime.sendMessage({
+    const response = await this.sendMessageWithTimeout({
       target: 'offscreen',
       type: 'parsePdf',
       candidateId: candidateId
-    });
+    }, 120000); // 2 minute timeout for PDF parsing
 
     if (response && response.success) {
       return response.text;
@@ -123,11 +152,11 @@ export class ResumeParser {
     const dataUrl = `data:image/png;base64,${base64Data}`; // Assuming PNG, offscreen might not care
 
     await setupOffscreenDocument('pages/offscreen.html');
-    const response = await chrome.runtime.sendMessage({
+    const response = await this.sendMessageWithTimeout({
       target: 'offscreen',
       type: 'recognizeImage',
       data: dataUrl
-    });
+    }, 60000); // 1 minute timeout for single image OCR
     
     if (response && response.success) {
       return response.text;

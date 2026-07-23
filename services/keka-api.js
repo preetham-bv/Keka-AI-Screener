@@ -150,7 +150,7 @@ export class KekaAPIClient {
   async getCandidateResume(candidateId) {
     await this.rateLimiter.acquire();
     try {
-      const response = await fetch(`${this.baseUrl}/v1/hire/jobs/candidate/${candidateId}/resume`, {
+      const response = await this.fetchWithRetry(`${this.baseUrl}/v1/hire/jobs/candidate/${candidateId}/resume`, {
         method: 'GET',
         headers: await this.getHeaders()
       });
