@@ -195,7 +195,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           candidateList.innerHTML = currentCandidates.map(c => `
             <label class="candidate-item">
               <input type="checkbox" value="${c.id}" class="candidate-cb" checked>
-              ${c.firstName || ''} ${c.lastName || ''} <span style="font-size: 11px; color: var(--text-secondary); text-transform: lowercase; font-weight: normal; margin-left: 4px;">(${c.email || c.id})</span>
+              <div class="candidate-info" style="display: flex; flex-direction: column; gap: 2px;">
+                <span class="candidate-name" style="font-weight: 500; color: var(--text-primary); text-transform: capitalize;">${(c.firstName || '') + ' ' + (c.lastName || '')}</span>
+                <span class="candidate-email" style="font-size: 11px; color: var(--text-secondary); text-transform: lowercase; font-weight: normal;">${c.email || c.id}</span>
+              </div>
             </label>
           `).join('');
         }
