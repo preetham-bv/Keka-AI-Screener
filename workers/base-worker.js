@@ -59,7 +59,8 @@ export class BaseWorker {
         lastError: `${errorPrefix}: ${error.message}`,
         retryCount: newRetryCount,
         currentWorker: null,
-        workerLockTime: null
+        workerLockTime: null,
+        nextAction: null
       });
     } else {
       // 10 second backoff for retries to prevent instant failure looping
