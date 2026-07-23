@@ -114,6 +114,15 @@ class ViewTasksPage {
         chrome.runtime.sendMessage({ type: 'GET_CANDIDATES_BY_TASK', taskId: task.taskId }, (candRes) => {
           if (statusRes && statusRes.success && candRes && candRes.success) {
             const status = statusRes.status;
+            if (!status) {
+              resolve();
+              return;
+            }
+            const progress = status.progress || {
+              completedCandidates: 0,
+              totalCandidates: 0,
+              percentage: 0
+            };
             const candidates = candRes.candidates || [];
             
             const isExpanded = task._isExpanded || false;
@@ -160,7 +169,7 @@ class ViewTasksPage {
                 <div>
                   <h3 class="card-title" style="margin-bottom: 4px;">Job: ${task.config ? task.config.jobId : (task.snapshot ? task.snapshot.kekaJobId : 'Unknown')}</h3>
                   <div class="header-subtext" style="font-size: 12px; color: var(--text-secondary);">
-                    Started: ${new Date(task.createdAt).toLocaleString()} • ${status.progress.completedCandidates}/${status.progress.totalCandidates} Candidates
+                    Started: ${new Date(task.createdAt).toLocaleString()} • ${progress.completedCandidates}/${progress.totalCandidates} Candidates
                   </div>
                 </div>
                 <div style="display:flex; align-items:center; gap: 12px;">
@@ -173,7 +182,7 @@ class ViewTasksPage {
               
               <div class="task-details ${isExpanded ? 'expanded' : ''}" id="details-${task.taskId}">
                   <div class="progress-wrapper" style="margin-top: 0; margin-bottom: 16px;">
-                    <div class="progress-fill" style="width: ${status.progress.percentage}%"></div>
+                    <div class="progress-fill" style="width: ${progress.percentage}%"></div>
                   </div>
                 
                 <h4 style="font-size: 13px; margin-bottom: 8px;">Worker Status Grid</h4>
