@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles/main.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="brand">Keka AI Reviewer</div>
+    <div class="nav-links">
+      <a href="settings.html" class="btn btn-secondary">Settings</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1>Dashboard</h1>
+    <p>Automate your ATS candidate screening with AI.</p>
+
+    <div class="card glass">
+      <div class="card-header">
+        <h3 class="card-title">Quick Actions</h3>
+      </div>
+      <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+        <button class="btn primary" id="btn-new-task" style="flex: 1;">New Pipeline Task</button>
+        <button class="btn" id="btn-view-tasks" style="flex: 1;">View Active Tasks</button>
+      </div>
+      <div style="display: flex; gap: 12px;">
+        <button class="btn btn-secondary" id="btn-kb" style="flex: 1; border: 1px solid var(--accent); color: var(--accent);">Manage Knowledge Base (JDs & Prompts)</button>
+      </div>
+    </div>
+
+    <div class="card glass" style="margin-top: 16px;">
+      <div class="card-header">
+        <h3 class="card-title">System Status</h3>
+      </div>
+      <div id="active-tasks-preview" style="font-size: 13px; color: var(--text-secondary);">
+        Loading active tasks...
+      </div>
+    </div>
+  </div>
+  
+  <script type="module" src="home.js"></script>
+</body>
+</html>

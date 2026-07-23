@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles/main.css">
+  <style>
+    .wizard-step {
+      display: none;
+    }
+    .wizard-step.active {
+      display: block;
+      animation: fadeIn 0.3s;
+    }
+    .wizard-nav {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .step-indicator {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .step-dot {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      color: var(--text-secondary);
+      transition: all 0.3s;
+    }
+    .step-dot.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+    }
+    .step-dot.completed {
+      background: var(--primary-dark, #2563eb);
+      border-color: var(--primary-dark, #2563eb);
+      color: white;
+    }
+    .scrollable-list {
+      max-height: 500px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      background: var(--surface);
+    }
+    .candidate-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 4px;
+      font-size: 13px;
+      border-bottom: 1px solid var(--border);
+    }
+    .candidate-item:last-child {
+      border-bottom: none;
+    }
+    .loading-spinner {
+      font-size: 13px;
+      color: var(--text-secondary);
+      font-style: italic;
+      padding: 8px;
+    }
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .summary-item {
+      display: flex;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+    .summary-label {
+      width: 120px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+    .summary-value {
+      flex: 1;
+      font-weight: 500;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="brand">Create Evaluation Task</div>
+    <div class="nav-links">
+      <a href="home.html" class="btn btn-secondary">Home</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="card glass">
+      
+      <!-- Step Indicator -->
+      <div class="step-indicator">
+        <div class="step-dot active" id="dot-1">1</div>
+        <div class="step-dot" id="dot-2">2</div>
+        <div class="step-dot" id="dot-3">3</div>
+        <div class="step-dot" id="dot-4">4</div>
+      </div>
+
+      <!-- Step 1: Select Job -->
+      <div class="wizard-step active" id="step-1">
+        <h3>Step 1: Select Job</h3>
+        <p class="text-secondary" style="margin-bottom:16px;">Choose a Keka job opening to evaluate candidates for.</p>
+        <div class="form-group">
+          <label>Select Keka Job</label>
+          <select id="select-job" class="input">
+            <option value="">Loading jobs...</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Step 2: Select Candidates -->
+      <div class="wizard-step" id="step-2">
+        <h3>Step 2: Select Candidates</h3>
+        <p class="text-secondary" style="margin-bottom:16px;">Select candidates currently in the 'Applied' stage.</p>
+        
+        <div class="card glass" style="margin-bottom: 16px;">
+          <div class="candidate-filters" style="display: flex; gap: 12px; align-items: center; padding: 12px; background: rgba(0,0,0,0.1); border-radius: 8px;">
+            <label>Stage:</label>
+            <select id="candidate-stage" class="input" style="flex: 1;">
+              <option value="Applied">Applied</option>
+              <option value="Screening">Screening</option>
+              <option value="Interview">Interview</option>
+              <option value="Offered">Offered</option>
+            </select>
+            <label style="display: flex; align-items: center; gap: 4px;">
+              <input type="checkbox" id="has-resume" checked> Resume Required
+            </label>
+            <button class="btn btn-secondary" id="btn-filter-apply">Apply Filters</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <label style="margin: 0;">Candidates</label>
+            <label style="font-size: 13px; cursor: pointer;">
+              <input type="checkbox" id="select-all-candidates" checked> Select / Deselect All
+            </label>
+          </div>
+          <div class="scrollable-list" id="candidate-list">
+            <div class="loading-spinner" id="candidate-spinner">Select a job first...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Knowledge Base Configuration -->
+      <div class="wizard-step" id="step-3">
+        <h3>Step 3: Configuration</h3>
+        <p class="text-secondary" style="margin-bottom:16px;">Select the Job Description and Prompt from your Knowledge Base.</p>
+        
+        <div class="form-group">
+          <label>Job Description (JD)</label>
+          <select id="select-jd" class="input">
+            <option value="">Select JD from Knowledge Base</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-top: 16px;">
+          <label>Evaluation Prompt</label>
+          <select id="select-prompt" class="input">
+            <option value="">Select Prompt from Knowledge Base</option>
+          </select>
+        </div>
+        
+        <div class="form-group" style="margin-top: 16px;">
+          <label>AI Service</label>
+          <select id="select-ai" class="input">
+            <option value="anthropic">Anthropic Claude</option>
+            <option value="openai">OpenAI GPT</option>
+            <option value="gemini">Google Gemini</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Step 4: Review and Submit -->
+      <div class="wizard-step" id="step-4">
+        <h3>Step 4: Review Task</h3>
+        <p class="text-secondary" style="margin-bottom:16px;">Review your task configuration before starting.</p>
+        
+        <div class="summary-card">
+          <div class="summary-item">
+            <div class="summary-label">Job:</div>
+            <div class="summary-value" id="summary-job"></div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-label">Candidates:</div>
+            <div class="summary-value" id="summary-candidates">0 selected</div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-label">JD:</div>
+            <div class="summary-value" id="summary-jd"></div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-label">Prompt:</div>
+            <div class="summary-value" id="summary-prompt"></div>
+          </div>
+          <div class="summary-item">
+            <div class="summary-label">AI Service:</div>
+            <div class="summary-value" id="summary-ai"></div>
+          </div>
+        </div>
+
+        <div class="card glass cost-calculator" style="margin-bottom: 16px;">
+          <h4 style="margin-bottom: 8px;">Estimated Cost Calculation</h4>
+          <div style="font-size: 13px; color: var(--text-secondary);">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span>Input Cost:</span> <span id="cost-input">~$0.003/1K tokens</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span>Output Cost:</span> <span id="cost-output">~$0.015/1K tokens</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 4px; font-weight: bold; color: var(--text-primary);">
+              <span>Estimated Total:</span> <span id="cost-total">~$0.15 - $0.30 per evaluation</span>
+            </div>
+          </div>
+        </div>
+        
+        <div id="status-msg" style="font-size: 13px; text-align: center; font-weight: 500;"></div>
+      </div>
+
+      <!-- Wizard Navigation -->
+      <div class="wizard-nav">
+        <button class="btn btn-secondary" id="btn-prev" style="visibility: hidden;">Back</button>
+        <button class="btn" id="btn-next">Next</button>
+        <button class="btn" id="btn-start" style="display: none;">Start Evaluation Task</button>
+      </div>
+      
+    </div>
+  </div>
+  
+  <script type="module" src="create-task.js"></script>
+</body>
+</html>
