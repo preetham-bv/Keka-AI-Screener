@@ -1,9 +1,5 @@
 import * as pdfjsLib from 'pdfjs-dist/build/pdf';
-import * as pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.js';
-import Tesseract from 'tesseract.js';
-
-// Inject worker directly to avoid pdf.js trying to load it via DOM <script> tags
-globalThis.pdfjsWorker = pdfjsWorker;
+import { setupOffscreenDocument } from './offscreen-setup.js';
 
 export class ResumeParser {
   /**
@@ -81,46 +77,48 @@ export class ResumeParser {
     const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
     const pdf = await loadingTask.promise;
     let fullText = '';
-    let tesseractWorker = null;
     
-    try {
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items.map(item => item.str).join(' ');
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map(item => item.str).join(' ');
+      
+      if (pageText.trim().length < 20) {
+        // Likely an image-based page. Use OCR fallback.
+        console.log(`Page ${i} has sparse text (${pageText.trim().length} chars). Falling back to OCR via offscreen document...`);
         
-        if (pageText.trim().length < 20) {
-          // Likely an image-based page. Use OCR fallback.
-          console.log(`Page ${i} has sparse text (${pageText.trim().length} chars). Falling back to OCR...`);
-          if (!tesseractWorker) {
-            tesseractWorker = await Tesseract.createWorker({
-              workerPath: chrome.runtime.getURL('tesseract.worker.min.js'),
-              logger: m => console.log('Tesseract OCR (PDF Fallback):', m.status, Math.round(m.progress * 100) + '%')
-            });
-            await tesseractWorker.loadLanguage('eng');
-            await tesseractWorker.initialize('eng');
-          }
-          
-          const viewport = page.getViewport({ scale: 2.0 });
-          const canvas = new OffscreenCanvas(viewport.width, viewport.height);
-          const context = canvas.getContext('2d');
-          
-          const renderContext = {
-            canvasContext: context,
-            viewport: viewport
-          };
-          
-          await page.render(renderContext).promise;
-          const blob = await canvas.convertToBlob({ type: 'image/png' });
-          const { data: { text } } = await tesseractWorker.recognize(blob);
-          fullText += text + '\n';
+        const viewport = page.getViewport({ scale: 2.0 });
+        const canvas = new OffscreenCanvas(viewport.width, viewport.height);
+        const context = canvas.getContext('2d');
+        
+        const renderContext = {
+          canvasContext: context,
+          viewport: viewport
+        };
+        
+        await page.render(renderContext).promise;
+        const blob = await canvas.convertToBlob({ type: 'image/png' });
+        
+        // Convert blob to base64 data URL to send over message passing
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        await new Promise(res => reader.onloadend = res);
+        const dataUrl = reader.result;
+
+        await setupOffscreenDocument('offscreen.html');
+        const response = await chrome.runtime.sendMessage({
+          target: 'offscreen',
+          type: 'recognizeImage',
+          data: dataUrl
+        });
+
+        if (response && response.success) {
+          fullText += response.text + '\n';
         } else {
-          fullText += pageText + '\n';
+          console.error('OCR failed:', response?.error);
         }
-      }
-    } finally {
-      if (tesseractWorker) {
-        await tesseractWorker.terminate();
+      } else {
+        fullText += pageText + '\n';
       }
     }
     
@@ -132,26 +130,28 @@ export class ResumeParser {
   }
 
   /**
-   * Parse Image using Tesseract.js
+   * Parse Image using Tesseract.js via Offscreen Document
    */
   static async parseImage(arrayBuffer) {
-    // Tesseract expects a File/Blob or Image element.
     const uint8arr = new Uint8Array(arrayBuffer);
-    const blob = new Blob([uint8arr], { type: 'image/png' }); // Assume PNG, Tesseract handles various formats
+    const blob = new Blob([uint8arr], { type: 'image/png' }); // Assume PNG
     
-    // Configure Tesseract to use local worker files copied to dist/
-    const worker = await Tesseract.createWorker({
-      workerPath: chrome.runtime.getURL('tesseract.worker.min.js'),
-      // Core paths might still require CDN if not fully offline bundled,
-      // but tesseract.js defaults to unpkg for core files.
-      logger: m => console.log('Tesseract:', m.status, Math.round(m.progress * 100) + '%')
+    const reader = new FileReader();
+    reader.readAsDataURL(blob);
+    await new Promise(res => reader.onloadend = res);
+    const dataUrl = reader.result;
+
+    await setupOffscreenDocument('offscreen.html');
+    const response = await chrome.runtime.sendMessage({
+      target: 'offscreen',
+      type: 'recognizeImage',
+      data: dataUrl
     });
     
-    await worker.loadLanguage('eng');
-    await worker.initialize('eng');
-    const { data: { text } } = await worker.recognize(blob);
-    await worker.terminate();
-    
-    return text;
+    if (response && response.success) {
+      return response.text;
+    } else {
+      throw new Error(response?.error || 'Unknown OCR error in offscreen document');
+    }
   }
 }

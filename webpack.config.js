@@ -9,7 +9,8 @@ module.exports = {
     'pages/create-task': './pages/create-task.js',
     'pages/view-tasks': './pages/view-tasks.js',
     'pages/settings': './pages/settings.js',
-    'pages/knowledge-base': './pages/knowledge-base.js'
+    'pages/knowledge-base': './pages/knowledge-base.js',
+    'pages/offscreen': './pages/offscreen.js'
   },
   output: {
     path: path.resolve(__dirname, 'dist'),

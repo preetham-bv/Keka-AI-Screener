@@ -11,7 +11,8 @@
   "permissions": [
     "storage",
     "alarms",
-    "unlimitedStorage"
+    "unlimitedStorage",
+    "offscreen"
   ],
   "host_permissions": [
     "https://*.keka.com/*",
