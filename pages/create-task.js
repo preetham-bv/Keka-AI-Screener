@@ -37,10 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const summaryPrompt = document.getElementById('summary-prompt');
   const summaryAi = document.getElementById('summary-ai');
 
-  // Filter Elements
-  const stageSelect = document.getElementById('candidate-stage');
-  const hasResumeCheck = document.getElementById('has-resume');
-  const btnFilterApply = document.getElementById('btn-filter-apply');
+  // Filter Elements removed
 
   // Cost Elements
   const costInput = document.getElementById('cost-input');
@@ -184,25 +181,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  function fetchCandidatesByFilters(jobId, stage) {
+  function fetchCandidates(jobId) {
     candidateList.innerHTML = '<div class="loading-spinner">Fetching candidates...</div>';
     
-    // Default to Applied if empty
-    stage = stage || 'Applied';
-
-    chrome.runtime.sendMessage({ type: 'FETCH_CANDIDATES', jobId, stage }, (response) => {
+    // Pass null or empty for stage to fetch all candidates
+    chrome.runtime.sendMessage({ type: 'FETCH_CANDIDATES', jobId, stage: null }, (response) => {
       if (response && response.success) {
         currentCandidates = response.candidates || [];
-        
-        // Filter out those without resumes if checked
-        if (hasResumeCheck.checked) {
-          currentCandidates = currentCandidates.filter(c => c.hasResume || c.resumeId || true); 
-          // Note: In real life we'd filter based on API response structure. 
-          // For now we assume true or filter based on mock properties.
-        }
 
         if (currentCandidates.length === 0) {
-          candidateList.innerHTML = `<div class="loading-spinner">No candidates in ${stage} stage matching criteria.</div>`;
+          candidateList.innerHTML = `<div class="loading-spinner">No candidates found for this job.</div>`;
         } else {
           candidateList.innerHTML = currentCandidates.map(c => `
             <label class="candidate-item">
@@ -226,14 +214,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       currentCandidates = [];
       return;
     }
-    fetchCandidatesByFilters(currentJobId, stageSelect.value);
-  });
-
-  // Apply filters
-  btnFilterApply.addEventListener('click', () => {
-    if (currentJobId) {
-      fetchCandidatesByFilters(currentJobId, stageSelect.value);
-    }
+    fetchCandidates(currentJobId);
   });
 
   // Select/Deselect All

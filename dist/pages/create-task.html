@@ -38,13 +38,13 @@
       transition: all 0.3s;
     }
     .step-dot.active {
-      background: var(--primary);
-      border-color: var(--primary);
+      background: var(--accent);
+      border-color: var(--accent);
       color: white;
     }
     .step-dot.completed {
-      background: var(--primary-dark, #2563eb);
-      border-color: var(--primary-dark, #2563eb);
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
       color: white;
     }
     .scrollable-list {
@@ -101,9 +101,12 @@
 </head>
 <body>
   <nav class="navbar">
-    <div class="brand">Create Evaluation Task</div>
+    <div class="brand" style="display: flex; gap: 8px; align-items: center;">
+      <button class="btn btn-secondary" id="btn-prev" style="visibility: hidden; padding: 4px 8px; font-size: 12px; margin-right: 8px;">&larr; Back</button>
+      Create Evaluation Task
+    </div>
     <div class="nav-links">
-      <a href="home.html" class="btn btn-secondary">Home</a>
+      <a href="home.html" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">Home</a>
     </div>
   </nav>
 
@@ -133,23 +136,9 @@
       <!-- Step 2: Select Candidates -->
       <div class="wizard-step" id="step-2">
         <h3>Step 2: Select Candidates</h3>
-        <p class="text-secondary" style="margin-bottom:16px;">Select candidates currently in the 'Applied' stage.</p>
+        <p class="text-secondary" style="margin-bottom:16px;">Select candidates from the job.</p>
         
-        <div class="card glass" style="margin-bottom: 16px;">
-          <div class="candidate-filters" style="display: flex; gap: 12px; align-items: center; padding: 12px; background: rgba(0,0,0,0.1); border-radius: 8px;">
-            <label>Stage:</label>
-            <select id="candidate-stage" class="input" style="flex: 1;">
-              <option value="Applied">Applied</option>
-              <option value="Screening">Screening</option>
-              <option value="Interview">Interview</option>
-              <option value="Offered">Offered</option>
-            </select>
-            <label style="display: flex; align-items: center; gap: 4px;">
-              <input type="checkbox" id="has-resume" checked> Resume Required
-            </label>
-            <button class="btn btn-secondary" id="btn-filter-apply">Apply Filters</button>
-          </div>
-        </div>
+      <!-- Removed filters card as they are confusing and API lacks direct stage mapping -->
 
         <div class="form-group">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -239,11 +228,10 @@
         <div id="status-msg" style="font-size: 13px; text-align: center; font-weight: 500;"></div>
       </div>
 
-      <!-- Wizard Navigation -->
-      <div class="wizard-nav">
-        <button class="btn btn-secondary" id="btn-prev" style="visibility: hidden;">Back</button>
-        <button class="btn" id="btn-next">Next</button>
-        <button class="btn" id="btn-start" style="display: none;">Start Evaluation Task</button>
+      <!-- Wizard Navigation (Floating) -->
+      <div class="wizard-nav" style="position: fixed; bottom: 20px; right: 20px; border-top: none; margin-top: 0; padding-top: 0; display: flex; justify-content: flex-end; z-index: 100;">
+        <button class="btn primary" id="btn-next" style="box-shadow: 0 4px 16px rgba(0,0,0,0.5);">Next &rarr;</button>
+        <button class="btn primary" id="btn-start" style="display: none; box-shadow: 0 4px 16px rgba(0,0,0,0.5);">Start Evaluation Task</button>
       </div>
       
     </div>
