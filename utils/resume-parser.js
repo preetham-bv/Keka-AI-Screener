@@ -81,12 +81,51 @@ export class ResumeParser {
     const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
     const pdf = await loadingTask.promise;
     let fullText = '';
+    let tesseractWorker = null;
     
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items.map(item => item.str).join(' ');
-      fullText += pageText + '\\n';
+    try {
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(' ');
+        
+        if (pageText.trim().length < 20) {
+          // Likely an image-based page. Use OCR fallback.
+          console.log(`Page ${i} has sparse text (${pageText.trim().length} chars). Falling back to OCR...`);
+          if (!tesseractWorker) {
+            tesseractWorker = await Tesseract.createWorker({
+              workerPath: chrome.runtime.getURL('tesseract.worker.min.js'),
+              logger: m => console.log('Tesseract OCR (PDF Fallback):', m.status, Math.round(m.progress * 100) + '%')
+            });
+            await tesseractWorker.loadLanguage('eng');
+            await tesseractWorker.initialize('eng');
+          }
+          
+          const viewport = page.getViewport({ scale: 2.0 });
+          const canvas = new OffscreenCanvas(viewport.width, viewport.height);
+          const context = canvas.getContext('2d');
+          
+          const renderContext = {
+            canvasContext: context,
+            viewport: viewport
+          };
+          
+          await page.render(renderContext).promise;
+          const blob = await canvas.convertToBlob({ type: 'image/png' });
+          const { data: { text } } = await tesseractWorker.recognize(blob);
+          fullText += text + '\n';
+        } else {
+          fullText += pageText + '\n';
+        }
+      }
+    } finally {
+      if (tesseractWorker) {
+        await tesseractWorker.terminate();
+      }
+    }
+    
+    if (fullText.trim().length < 50) {
+      throw new Error("Insufficient text content parsed. The resume might be an image-only PDF without a text layer, and OCR failed to extract meaningful text, or the file is corrupted.");
     }
     
     return fullText;
