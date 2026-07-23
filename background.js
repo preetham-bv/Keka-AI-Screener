@@ -192,6 +192,26 @@ function handleMessage(message, sender, sendResponse) {
           break;
         }
 
+        case 'CLEAR_PAST_TASKS': {
+          try {
+            const data = await new Promise(resolve => chrome.storage.local.get(null, resolve));
+            const keysToRemove = Object.keys(data).filter(key => {
+              if (key.startsWith('task_metadata_')) {
+                const task = data[key];
+                return task && task.status !== 'running';
+              }
+              return false;
+            });
+            if (keysToRemove.length > 0) {
+              await new Promise(resolve => chrome.storage.local.remove(keysToRemove, resolve));
+            }
+            sendResponse({ success: true, cleared: keysToRemove.length });
+          } catch (e) {
+            sendResponse({ success: false, error: e.message });
+          }
+          break;
+        }
+
         case 'GET_CANDIDATES_BY_TASK': {
           try {
             const cands = await dbManager.getCandidatesByTask(message.taskId);

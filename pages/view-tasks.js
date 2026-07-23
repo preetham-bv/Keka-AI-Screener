@@ -303,9 +303,24 @@ document.addEventListener('DOMContentLoaded', () => {
   
   const pastTasksHeader = document.getElementById('past-tasks-header');
   if (pastTasksHeader) {
-    pastTasksHeader.addEventListener('click', function() {
+    pastTasksHeader.addEventListener('click', function(e) {
+      if (e.target.closest('#btn-clear-past')) return;
       document.getElementById('past-tasks-container').classList.toggle('hidden'); 
       this.querySelector('.chevron').classList.toggle('rotated');
+    });
+  }
+
+  const btnClearPast = document.getElementById('btn-clear-past');
+  if (btnClearPast) {
+    btnClearPast.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if(confirm('Are you sure you want to clear all past tasks? This cannot be undone.')) {
+        chrome.runtime.sendMessage({ type: 'CLEAR_PAST_TASKS' }, (response) => {
+          if (response && response.success) {
+            if (page) page.loadTasks();
+          }
+        });
+      }
     });
   }
 

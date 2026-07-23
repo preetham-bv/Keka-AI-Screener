@@ -79,9 +79,12 @@
     
     <div id="past-tasks-header" class="task-header" style="margin-top: 32px; background: transparent; padding: 0; cursor: pointer; border-bottom: 1px solid var(--border);">
       <h3 style="margin: 0; padding-bottom: 8px;">Past Tasks</h3>
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron" style="transition: 0.2s;">
-        <polyline points="6 9 12 15 18 9"></polyline>
-      </svg>
+      <div style="display: flex; align-items: center; gap: 12px; padding-bottom: 8px;">
+        <button id="btn-clear-past" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px; color: var(--error); border-color: rgba(239, 68, 68, 0.3);">Clear All</button>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron" style="transition: 0.2s;">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </div>
     </div>
     <div id="past-tasks-container" class="hidden" style="margin-top: 16px;">
       <div style="text-align: center; color: var(--text-secondary); margin-top: 20px; font-style: italic; font-size: 13px;">No past tasks</div>
