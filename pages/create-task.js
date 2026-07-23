@@ -195,7 +195,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           candidateList.innerHTML = currentCandidates.map(c => `
             <label class="candidate-item">
               <input type="checkbox" value="${c.id}" class="candidate-cb" checked>
-              ${c.firstName || ''} ${c.lastName || ''} (${c.email || c.id})
+              ${c.firstName || ''} ${c.lastName || ''} <span style="font-size: 11px; color: var(--text-secondary); text-transform: lowercase; font-weight: normal; margin-left: 4px;">(${c.email || c.id})</span>
             </label>
           `).join('');
         }
