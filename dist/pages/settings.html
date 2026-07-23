@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles/main.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="brand">Settings</div>
+    <div class="nav-links">
+      <a href="home.html" class="btn btn-secondary">Back</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="card glass">
+      <div class="card-header">
+        <h3 class="card-title">Keka API Configuration</h3>
+      </div>
+      <div class="form-group">
+        <label>Keka Company Subdomain:</label>
+        <input type="text" id="keka-company" class="input" placeholder="e.g. acmecorp">
+        <small>If your URL is acmecorp.keka.com, enter 'acmecorp'</small>
+      </div>
+      <div class="form-group">
+        <label>Keka API Credentials:</label>
+        <input type="text" id="keka-client-id" class="input" placeholder="Enter Client ID" style="margin-bottom: 8px;">
+        <input type="password" id="keka-client-secret" class="input" placeholder="Enter Client Secret" style="margin-bottom: 8px;">
+        <input type="password" id="keka-key" class="input" placeholder="Enter Keka API Key">
+        <small>Generate in Keka Developer Portal</small>
+      </div>
+      <div style="display: flex; gap: 8px; margin-top: 12px;">
+        <button class="btn" id="btn-test-keka">Test Keka Connection</button>
+        <span id="keka-test-status" style="font-size: 13px; align-self: center;"></span>
+      </div>
+    </div>
+
+    <div class="card glass" style="margin-top: 16px;">
+      <div class="card-header">
+        <h3 class="card-title">AI Services Configuration</h3>
+      </div>
+      
+      <div style="padding: 16px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px;">
+        <h4 style="margin-bottom: 12px;">Anthropic (Claude)</h4>
+        <div class="form-group">
+          <label>API Key</label>
+          <input type="password" id="anthropic-key" class="input" placeholder="sk-ant-...">
+        </div>
+        <div class="form-group" style="margin-top: 12px;">
+          <label>Model</label>
+          <select id="anthropic-select-model" class="input">
+            <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet</option>
+            <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+            <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
+            <option value="custom">Custom (Specify Below)</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-top: 12px;">
+          <label>Custom Model (Optional)</label>
+          <input type="text" id="anthropic-model" class="input" placeholder="e.g. glm-5.2">
+        </div>
+        <div class="form-group" style="margin-top: 12px;">
+          <label>Base URL (Optional)</label>
+          <input type="text" id="anthropic-url" class="input" placeholder="e.g. https://api.z.ai/api/anthropic">
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 12px;">
+          <button class="btn btn-secondary" id="btn-test-anthropic">Test Anthropic</button>
+          <span id="anthropic-test-status" style="font-size: 13px; align-self: center;"></span>
+        </div>
+      </div>
+
+      <div style="padding: 16px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px;">
+        <h4 style="margin-bottom: 12px;">OpenAI</h4>
+        <div class="form-group">
+          <label>API Key</label>
+          <input type="password" id="openai-key" class="input" placeholder="sk-...">
+        </div>
+        <div class="form-group" style="margin-top: 12px;">
+          <label>Model</label>
+          <select id="openai-select-model" class="input">
+            <option value="gpt-4o">GPT-4o</option>
+            <option value="gpt-4-turbo">GPT-4 Turbo</option>
+            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+          </select>
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 12px;">
+          <button class="btn btn-secondary" id="btn-test-openai">Test OpenAI</button>
+          <span id="openai-test-status" style="font-size: 13px; align-self: center;"></span>
+        </div>
+      </div>
+
+      <div style="padding: 16px; border: 1px solid var(--border); border-radius: 8px;">
+        <h4 style="margin-bottom: 12px;">Google Gemini</h4>
+        <div class="form-group">
+          <label>API Key</label>
+          <input type="password" id="gemini-key" class="input" placeholder="AIzaSy...">
+        </div>
+        <div class="form-group" style="margin-top: 12px;">
+          <label>Model</label>
+          <select id="gemini-select-model" class="input">
+            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+          </select>
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 12px;">
+          <button class="btn btn-secondary" id="btn-test-gemini">Test Gemini</button>
+          <span id="gemini-test-status" style="font-size: 13px; align-self: center;"></span>
+        </div>
+      </div>
+    </div>
+    
+    <button class="btn primary" id="btn-save" style="margin-top: 16px;">Save Settings</button>
+    <div id="status-msg" style="margin-top: 8px; font-size: 13px; text-align: center;"></div>
+  </div>
+  
+  <script type="module" src="settings.js"></script>
+</body>
+</html>
