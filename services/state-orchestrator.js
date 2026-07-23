@@ -70,10 +70,12 @@ export class StateOrchestrator {
         const tasks = [];
         for (const [key, value] of Object.entries(items)) {
           if (key.startsWith('task_metadata_') && value.status === 'running') {
-            tasks.push(value.taskId);
+            tasks.push(value);
           }
         }
-        resolve(tasks);
+        // Prioritize newest tasks first
+        tasks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        resolve(tasks.map(t => t.taskId));
       });
     });
   }
@@ -295,6 +297,7 @@ ${jdContent}
       const stalledCandidates = await dbManager.getStalledCandidates(taskId);
       for (const candidate of stalledCandidates) {
         // Force-clear the lock so processQueue doesn't ignore it
+        this.inFlightLocks.delete(candidate.candidateId);
         await dbManager.updateCandidateRecord(taskId, candidate.candidateId, {
           currentWorker: null,
           workerLockTime: null,
@@ -315,7 +318,14 @@ ${jdContent}
       metadata.cancelReason = reason;
       await new Promise(resolve => chrome.storage.local.set({ [`task_metadata_${taskId}`]: metadata }, resolve));
       
-      // Task cancelled, derived naturally by status
+      // Clear all in-flight locks for this task's candidates
+      const candidates = await dbManager.getCandidatesByTask(taskId);
+      for (const c of candidates) {
+        this.inFlightLocks.delete(c.candidateId);
+      }
+      
+      // Trigger a pump to start other tasks if they were blocked
+      this.pumpQueue();
     }
   }
 

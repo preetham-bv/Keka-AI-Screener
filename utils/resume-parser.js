@@ -96,7 +96,7 @@ export class ResumeParser {
   /**
    * Helper function to send message to offscreen document with timeout
    */
-  static async sendMessageWithTimeout(message, timeoutMs = 120000) {
+  static async sendMessageWithTimeout(message, timeoutMs = 300000) {
     return new Promise((resolve, reject) => {
       let isSettled = false;
       const timeoutId = setTimeout(() => {
@@ -135,7 +135,7 @@ export class ResumeParser {
       target: 'offscreen',
       type: 'parsePdf',
       candidateId: candidateId
-    }, 120000); // 2 minute timeout for PDF parsing
+    }, 300000); // 5 minute timeout for PDF parsing
 
     if (response && response.success) {
       return response.text;
