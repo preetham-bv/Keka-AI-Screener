@@ -58,7 +58,7 @@ export class WorkerF extends BaseWorker {
 ${aiOutput}
 
 ---
-*System Info: Candidate: ${candidateName} | Evaluated: ${dateStr} | AI Model: ${model} | Keka ATS AI Reviewer*`;
+*System Info: Candidate: ${candidateName} | Evaluated: ${dateStr} | AI Model: ${model} | Keka AI Screener (by Preetham Phirangi)*`;
 
     return rawMarkdown
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
