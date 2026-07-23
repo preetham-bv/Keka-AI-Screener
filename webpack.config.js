@@ -41,7 +41,10 @@ module.exports = {
         { from: 'pages/**/*.html', to: '.' },
         { from: 'styles/**/*.css', to: '.' },
         { from: 'node_modules/pdfjs-dist/build/pdf.worker.min.js', to: 'pdf.worker.min.js', noErrorOnMissing: true },
-        { from: 'node_modules/tesseract.js/dist/worker.min.js', to: 'tesseract.worker.min.js', noErrorOnMissing: true }
+        { from: 'node_modules/tesseract.js/dist/worker.min.js', to: 'tesseract.worker.min.js', noErrorOnMissing: true },
+        { from: 'icon16.png', to: 'icon16.png', noErrorOnMissing: true },
+        { from: 'icon48.png', to: 'icon48.png', noErrorOnMissing: true },
+        { from: 'icon128.png', to: 'icon128.png', noErrorOnMissing: true }
       ]
     })
   ]
