@@ -144,8 +144,14 @@
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <label style="margin: 0;">Candidates</label>
             <label style="font-size: 13px; cursor: pointer;">
-              <input type="checkbox" id="select-all-candidates" checked> Select / Deselect All
+              <input type="checkbox" id="select-all-candidates"> Select / Deselect All
             </label>
+          </div>
+          <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+            <input type="text" id="candidate-search" class="input" placeholder="Search by name or email..." style="flex: 2;">
+            <select id="candidate-tag-filter" class="input" style="flex: 1;">
+              <option value="">All Tags</option>
+            </select>
           </div>
           <div class="scrollable-list" id="candidate-list">
             <div class="loading-spinner" id="candidate-spinner">Select a job first...</div>

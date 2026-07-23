@@ -1,18 +1,18 @@
-import * as pdfjsLib from 'pdfjs-dist/build/pdf';
 import { setupOffscreenDocument } from './offscreen-setup.js';
+import { dbManager } from '../services/instances.js';
 
 export class ResumeParser {
   /**
    * Parse the candidate's resume buffer based on file type.
    * Keka often returns PDF or images.
    */
-  static async parse(bufferOrBase64, contentType = 'application/pdf') {
+  static async parse(bufferOrBase64, contentType = 'application/pdf', candidateId = null) {
     try {
       const typeStr = contentType.toLowerCase();
       let text = '';
       
       if (typeStr.includes('pdf')) {
-        text = await this.parsePdf(bufferOrBase64);
+        text = await this.parsePdf(bufferOrBase64, candidateId);
       } else if (typeStr.includes('image')) {
         text = await this.parseImage(bufferOrBase64);
       } else if (typeStr.includes('json') || typeStr.includes('text/plain')) {
@@ -53,8 +53,18 @@ export class ResumeParser {
            }
            const fileBuffer = await fileResponse.arrayBuffer();
            const fileContentType = fileResponse.headers.get('content-type') || 'application/pdf';
+           
+           if (candidateId) {
+             // Save the actual downloaded document over the JSON payload in DB
+             // so the offscreen document can fetch the actual PDF buffer
+             await dbManager.storeRawResume(candidateId, { 
+               data: fileBuffer, 
+               contentType: fileContentType 
+             });
+           }
+
            // Recursively parse the downloaded file
-           return await this.parse(fileBuffer, fileContentType);
+           return await this.parse(fileBuffer, fileContentType, candidateId);
         }
 
         // If no URL found, just return the raw text
@@ -71,77 +81,48 @@ export class ResumeParser {
   }
 
   /**
-   * Parse PDF using pdf.js
+   * Helper function to convert ArrayBuffer to Base64
    */
-  static async parsePdf(arrayBuffer) {
-    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
-    const pdf = await loadingTask.promise;
-    let fullText = '';
-    
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items.map(item => item.str).join(' ');
-      
-      if (pageText.trim().length < 20) {
-        // Likely an image-based page. Use OCR fallback.
-        console.log(`Page ${i} has sparse text (${pageText.trim().length} chars). Falling back to OCR via offscreen document...`);
-        
-        const viewport = page.getViewport({ scale: 2.0 });
-        const canvas = new OffscreenCanvas(viewport.width, viewport.height);
-        const context = canvas.getContext('2d');
-        
-        const renderContext = {
-          canvasContext: context,
-          viewport: viewport
-        };
-        
-        await page.render(renderContext).promise;
-        const blob = await canvas.convertToBlob({ type: 'image/png' });
-        
-        // Convert blob to base64 data URL to send over message passing
-        const reader = new FileReader();
-        reader.readAsDataURL(blob);
-        await new Promise(res => reader.onloadend = res);
-        const dataUrl = reader.result;
-
-        await setupOffscreenDocument('offscreen.html');
-        const response = await chrome.runtime.sendMessage({
-          target: 'offscreen',
-          type: 'recognizeImage',
-          data: dataUrl
-        });
-
-        if (response && response.success) {
-          fullText += response.text + '\n';
-        } else {
-          console.error('OCR failed:', response?.error);
-        }
-      } else {
-        fullText += pageText + '\n';
-      }
+  static bufferToBase64(buffer) {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
     }
-    
-    if (fullText.trim().length < 50) {
-      throw new Error("Insufficient text content parsed. The resume might be an image-only PDF without a text layer, and OCR failed to extract meaningful text, or the file is corrupted.");
+    return btoa(binary);
+  }
+
+  /**
+   * Parse PDF using offscreen document
+   */
+  static async parsePdf(arrayBuffer, candidateId) {
+    if (!candidateId) {
+      throw new Error('candidateId is strictly required for parsePdf in this architecture');
     }
-    
-    return fullText;
+
+    await setupOffscreenDocument('pages/offscreen.html');
+    const response = await chrome.runtime.sendMessage({
+      target: 'offscreen',
+      type: 'parsePdf',
+      candidateId: candidateId
+    });
+
+    if (response && response.success) {
+      return response.text;
+    } else {
+      throw new Error(response?.error || 'Unknown PDF parsing error in offscreen document');
+    }
   }
 
   /**
    * Parse Image using Tesseract.js via Offscreen Document
    */
   static async parseImage(arrayBuffer) {
-    const uint8arr = new Uint8Array(arrayBuffer);
-    const blob = new Blob([uint8arr], { type: 'image/png' }); // Assume PNG
-    
-    const reader = new FileReader();
-    reader.readAsDataURL(blob);
-    await new Promise(res => reader.onloadend = res);
-    const dataUrl = reader.result;
+    const base64Data = this.bufferToBase64(arrayBuffer);
+    const dataUrl = `data:image/png;base64,${base64Data}`; // Assuming PNG, offscreen might not care
 
-    await setupOffscreenDocument('offscreen.html');
+    await setupOffscreenDocument('pages/offscreen.html');
     const response = await chrome.runtime.sendMessage({
       target: 'offscreen',
       type: 'recognizeImage',

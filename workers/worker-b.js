@@ -29,8 +29,10 @@ export class WorkerB extends BaseWorker {
            }
         }
 
-        const parsedText = await ResumeParser.parse(rawResume.data, rawResume.contentType);
+        // Offscreen parsing
+        const parsedText = await ResumeParser.parse(rawResume.data, rawResume.contentType, c.candidateId);
         
+        // Ensure some minimum text length for extraction
         if (!parsedText || parsedText.length < 10) {
           throw new Error('Insufficient text content parsed. The resume might be an image-only PDF without a text layer, or the file is corrupted.');
         }

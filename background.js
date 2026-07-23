@@ -146,6 +146,11 @@ async function handleInstall(details) {
  * Handle incoming messages
  */
 function handleMessage(message, sender, sendResponse) {
+  // IGNORE messages meant for the offscreen document to avoid interfering with its listeners
+  if (message && message.target === 'offscreen') {
+    return false; // Do not keep channel open, do not respond
+  }
+
   (async () => {
     try {
       await ensureInitialized();

@@ -47,6 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let currentCandidates = [];
   let currentJobId = null;
   let kbData = { jds: [], prompts: [] };
+  let selectedCandidateIds = new Set();
 
   // Init
   loadKB();
@@ -102,8 +103,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return false;
       }
     } else if (step === 2) {
-      const selected = document.querySelectorAll('.candidate-cb:checked');
-      if (selected.length === 0) {
+      if (selectedCandidateIds.size === 0) {
         statusMsg.innerText = 'Please select at least one candidate.';
         return false;
       }
@@ -121,8 +121,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const jobText = selectJob.options[selectJob.selectedIndex]?.text || 'None';
     summaryJob.innerText = jobText;
     
-    const selectedCbs = document.querySelectorAll('.candidate-cb:checked');
-    summaryCandidates.innerText = `${selectedCbs.length} candidate(s) selected`;
+    summaryCandidates.innerText = `${selectedCandidateIds.size} candidate(s) selected`;
     
     const jdText = selectJd.options[selectJd.selectedIndex]?.text || 'None';
     summaryJd.innerText = jdText;
@@ -146,8 +145,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     costInput.innerText = `~$${inCost}/1K tokens`;
     costOutput.innerText = `~$${outCost}/1K tokens`;
     
-    const minCost = (inCost * 2 + outCost * 0.5) * selectedCbs.length;
-    const maxCost = (inCost * 4 + outCost * 1.5) * selectedCbs.length;
+    const minCost = (inCost * 2 + outCost * 0.5) * selectedCandidateIds.size;
+    const maxCost = (inCost * 4 + outCost * 1.5) * selectedCandidateIds.size;
     costTotal.innerText = `~$${minCost.toFixed(2)} - $${maxCost.toFixed(2)} total`;
   }
 
@@ -192,15 +191,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (currentCandidates.length === 0) {
           candidateList.innerHTML = `<div class="loading-spinner">No candidates found for this job.</div>`;
         } else {
-          candidateList.innerHTML = currentCandidates.map(c => `
-            <label class="candidate-item">
-              <input type="checkbox" value="${c.id}" class="candidate-cb" checked>
+          // Extract unique tags
+          const uniqueTags = new Set();
+          currentCandidates.forEach(c => {
+            if (c.candidateTags && Array.isArray(c.candidateTags)) {
+              c.candidateTags.forEach(t => uniqueTags.add(t.name));
+            }
+          });
+          
+          // Populate tag dropdown
+          const tagFilter = document.getElementById('candidate-tag-filter');
+          if (tagFilter) {
+            tagFilter.innerHTML = '<option value="">All Tags</option>' + 
+              Array.from(uniqueTags).sort().map(tag => `<option value="${tag}">${tag}</option>`).join('');
+          }
+
+          candidateList.innerHTML = currentCandidates.map(c => {
+            const tags = (c.candidateTags || []).map(t => t.name).join(',');
+            return `
+            <label class="candidate-item" data-tags="${tags}">
+              <input type="checkbox" value="${c.id}" class="candidate-cb" ${selectedCandidateIds.has(c.id) ? 'checked' : ''}>
               <div class="candidate-info" style="display: flex; flex-direction: column; gap: 2px;">
                 <span class="candidate-name" style="font-weight: 500; color: var(--text-primary); text-transform: capitalize;">${(c.firstName || '') + ' ' + (c.lastName || '')}</span>
                 <span class="candidate-email" style="font-size: 11px; color: var(--text-secondary); text-transform: lowercase; font-weight: normal;">${c.email || c.id}</span>
+                ${tags ? `<span style="font-size: 10px; color: var(--accent);">${tags.split(',').join(', ')}</span>` : ''}
               </div>
             </label>
-          `).join('');
+            `;
+          }).join('');
         }
       } else {
         candidateList.innerHTML = '<div class="loading-spinner" style="color:var(--error)">Failed to load candidates.</div>';
@@ -209,8 +227,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // Fetch Candidates when job changes
   selectJob.addEventListener('change', (e) => {
+    if (currentJobId !== e.target.value) {
+      selectedCandidateIds.clear();
+      if (selectAllCb) {
+        selectAllCb.checked = false;
+        selectAllCb.indeterminate = false;
+      }
+    }
     currentJobId = e.target.value;
     if (!currentJobId) {
       candidateList.innerHTML = '<div class="loading-spinner">Select a job to load candidates...</div>';
@@ -226,18 +250,77 @@ document.addEventListener('DOMContentLoaded', async () => {
     selectAllCb.addEventListener('change', (e) => {
       const isChecked = e.target.checked;
       const checkboxes = document.querySelectorAll('.candidate-cb');
-      checkboxes.forEach(cb => cb.checked = isChecked);
+      checkboxes.forEach(cb => {
+        const item = cb.closest('.candidate-item');
+        if (item && item.style.display !== 'none') {
+          cb.checked = isChecked;
+          if (isChecked) {
+            selectedCandidateIds.add(cb.value);
+          } else {
+            selectedCandidateIds.delete(cb.value);
+          }
+        }
+      });
     });
   }
+
+  // Search and Tag Filter
+  const searchInput = document.getElementById('candidate-search');
+  const tagFilter = document.getElementById('candidate-tag-filter');
+  
+  function applyFilters() {
+    const term = searchInput ? searchInput.value.toLowerCase() : '';
+    const selectedTag = tagFilter ? tagFilter.value : '';
+    
+    const items = candidateList.querySelectorAll('.candidate-item');
+    items.forEach(item => {
+      const name = item.querySelector('.candidate-name').innerText.toLowerCase();
+      const email = item.querySelector('.candidate-email').innerText.toLowerCase();
+      const itemTags = item.getAttribute('data-tags') || '';
+      
+      const matchesSearch = term === '' || name.includes(term) || email.includes(term);
+      const matchesTag = selectedTag === '' || itemTags.split(',').includes(selectedTag);
+      
+      if (matchesSearch && matchesTag) {
+        item.style.display = 'flex';
+      } else {
+        item.style.display = 'none';
+      }
+    });
+    
+    // Update select-all checkbox state based on visible items
+    if (selectAllCb) {
+      const allCbs = Array.from(document.querySelectorAll('.candidate-cb')).filter(cb => cb.closest('.candidate-item').style.display !== 'none');
+      if (allCbs.length > 0) {
+        const allChecked = allCbs.every(cb => cb.checked);
+        const someChecked = allCbs.some(cb => cb.checked);
+        selectAllCb.checked = allChecked;
+        selectAllCb.indeterminate = someChecked && !allChecked;
+      } else {
+        selectAllCb.checked = false;
+        selectAllCb.indeterminate = false;
+      }
+    }
+  }
+
+  if (searchInput) searchInput.addEventListener('input', applyFilters);
+  if (tagFilter) tagFilter.addEventListener('change', applyFilters);
 
   // Update "Select All" if individual checkboxes are manually changed
   candidateList.addEventListener('change', (e) => {
     if (e.target.classList.contains('candidate-cb')) {
-      const allCbs = document.querySelectorAll('.candidate-cb');
-      const allChecked = Array.from(allCbs).every(cb => cb.checked);
-      const someChecked = Array.from(allCbs).some(cb => cb.checked);
-      selectAllCb.checked = allChecked;
-      selectAllCb.indeterminate = someChecked && !allChecked;
+      if (e.target.checked) {
+        selectedCandidateIds.add(e.target.value);
+      } else {
+        selectedCandidateIds.delete(e.target.value);
+      }
+      const allCbs = Array.from(document.querySelectorAll('.candidate-cb')).filter(cb => cb.closest('.candidate-item').style.display !== 'none');
+      const allChecked = allCbs.every(cb => cb.checked);
+      const someChecked = allCbs.some(cb => cb.checked);
+      if (selectAllCb) {
+        selectAllCb.checked = allChecked;
+        selectAllCb.indeterminate = someChecked && !allChecked;
+      }
     }
   });
 
@@ -258,8 +341,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       aiModel = aiService === 'anthropic' ? 'claude-3-5-sonnet-20241022' : (aiService === 'gemini' ? 'gemini-1.5-pro' : 'gpt-4');
     }
     
-    const checkboxes = document.querySelectorAll('.candidate-cb:checked');
-    const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+    const selectedIds = Array.from(selectedCandidateIds);
     
     const selectedJd = kbData.jds.find(j => j.id === jdId);
     const selectedPrompt = kbData.prompts.find(p => p.id === promptId);
