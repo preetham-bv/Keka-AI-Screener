@@ -9,11 +9,9 @@ import { WorkerF } from '../workers/worker-f.js';
 
 export class StateOrchestrator {
   constructor() {
-    this.processingLocks = new Map();
+    this.inFlightLocks = new Map();
+    this.maxConcurrency = 5;
     this.isInitialized = false;
-    
-    // Instead of using overlapping db events, we'll use a direct queue
-    this.taskQueue = [];
     this.isProcessingQueue = false;
   }
 
@@ -45,74 +43,104 @@ export class StateOrchestrator {
     });
     
     // Resume orphaned tasks on boot
-    chrome.storage.local.get('active_task_queue', async (result) => {
-      const activeTasks = result.active_task_queue || [];
-      for (const taskId of activeTasks) {
-        const metadata = await getTaskMetadata(taskId);
-        if (metadata && metadata.status === 'running') {
-          const candidates = await dbManager.getCandidatesByTask(taskId);
-          for (const c of candidates) {
-            if (!['completed', 'failed', 'posted'].includes(c.status)) {
-              this.enqueueCandidate(taskId, c);
-            }
-          }
+    const activeTasks = await this.getActiveTasks();
+    for (const taskId of activeTasks) {
+      const candidates = await dbManager.getCandidatesByTask(taskId);
+      for (const c of candidates) {
+        if (!['completed', 'failed', 'posted'].includes(c.status)) {
+          this.enqueueCandidate(taskId, c);
         }
       }
-    });
+    }
 
     this.isInitialized = true;
     console.log('✅ State Orchestrator initialized');
   }
 
   enqueueCandidate(taskId, candidate) {
-    if (candidate.currentWorker) return; // Skip if already being processed normally
-    if (!candidate.nextAction && candidate.status !== 'pending' && candidate.status !== 'posted' && candidate.status !== 'failed') return;
-    this.taskQueue.push({ taskId, candidateId: candidate.candidateId });
-    this.processQueue();
+    this.pumpQueue();
   }
 
-  async processQueue() {
+  async getActiveTasks() {
+    return new Promise((resolve) => {
+      chrome.storage.local.get(null, (items) => {
+        const tasks = [];
+        for (const [key, value] of Object.entries(items)) {
+          if (key.startsWith('task_metadata_') && value.status === 'running') {
+            tasks.push(value.taskId);
+          }
+        }
+        resolve(tasks);
+      });
+    });
+  }
+
+  async pumpQueue() {
     if (this.isProcessingQueue) return;
     this.isProcessingQueue = true;
 
     try {
-      while (this.taskQueue.length > 0) {
-        const { taskId, candidateId } = this.taskQueue.shift();
+      // 1. Determine how many slots we have
+      while (this.inFlightLocks.size < this.maxConcurrency) {
+        let foundCandidate = false;
         
-        // Ensure we don't process locked candidates concurrently in memory
-        if (this.processingLocks.has(candidateId)) {
-          this.taskQueue.push({ taskId, candidateId });
-          await new Promise(r => setTimeout(r, 200));
-          continue;
-        }
-
-        // Fetch fresh state from DB to avoid processing stale events
-        const candidate = await dbManager.getCandidateById(taskId, candidateId);
-        if (!candidate || candidate.currentWorker) {
-          // If already being processed by another worker, ignore this event
-          continue;
-        }
-        
-        this.processingLocks.set(candidateId, Date.now());
-        
-        try {
-          if (candidate.status === 'failed') {
-            await this.updateTaskProgress(taskId);
-          } else if (candidate.nextAction) {
-            await this.processNextAction(taskId, candidate);
-          } else if (candidate.status === 'pending') {
-            await this.routeCandidateToWorker(taskId, candidate);
-          } else if (candidate.status === 'posted') {
-            await this.updateTaskProgress(taskId);
+        // 2. Find the next pending candidate across all active tasks
+        const activeTasks = await this.getActiveTasks();
+        for (const taskId of activeTasks) {
+          if (this.inFlightLocks.size >= this.maxConcurrency) break;
+          
+          const candidates = await dbManager.getCandidatesByTask(taskId);
+          for (const candidate of candidates) {
+             if (this.inFlightLocks.size >= this.maxConcurrency) break;
+             
+             // Skip if locked or actively being processed
+             if (this.inFlightLocks.has(candidate.candidateId)) continue;
+             if (candidate.currentWorker) continue;
+             
+             // Skip if completed or fully failed/posted
+             if (['completed', 'failed', 'posted'].includes(candidate.status) && !candidate.nextAction) continue;
+             if (candidate.status !== 'pending' && !candidate.nextAction) continue;
+             
+             // Enforce retry backoff delay
+             if (candidate.nextRetryAfter && Date.now() < candidate.nextRetryAfter) continue;
+             
+             // We found a candidate to process!
+             foundCandidate = true;
+             this.inFlightLocks.set(candidate.candidateId, Date.now());
+             
+             // Fire and forget execution to allow parallel processing
+             this.executeCandidate(taskId, candidate).catch(err => {
+               console.error('Error executing candidate:', err);
+             }).finally(() => {
+               this.inFlightLocks.delete(candidate.candidateId);
+               this.pumpQueue(); // Trigger next pump when done
+             });
           }
-        } catch (error) {
-          console.error(`Error processing candidate ${candidateId}:`, error);
-        } finally {
-          this.processingLocks.delete(candidateId);
         }
+        
+        // If we looped through all active tasks and found nothing to do, break the loop
+        if (!foundCandidate) break;
       }
+    } catch (e) {
+      console.error('pumpQueue error:', e);
     } finally {
       this.isProcessingQueue = false;
+    }
+  }
+
+  async executeCandidate(taskId, candidate) {
+    try {
+      if (candidate.status === 'failed' && !candidate.nextAction) {
+        await this.updateTaskProgress(taskId);
+      } else if (candidate.nextAction) {
+        await this.processNextAction(taskId, candidate);
+      } else if (candidate.status === 'pending') {
+        await this.routeCandidateToWorker(taskId, candidate);
+      } else if (candidate.status === 'posted') {
+        await this.updateTaskProgress(taskId);
+      }
+    } catch (error) {
+      console.error(`Error executing candidate ${candidate.candidateId}:`, error);
     }
   }
 
@@ -160,14 +188,7 @@ export class StateOrchestrator {
       }, resolve);
     });
 
-    // Add task to active queue
-    await new Promise((resolve) => {
-      chrome.storage.local.get('active_task_queue', (result) => {
-        const queue = result.active_task_queue || [];
-        queue.push(taskId);
-        chrome.storage.local.set({ 'active_task_queue': queue }, resolve);
-      });
-    });
+    // Tasks are dynamically derived as active when their status is 'running'
 
     // Insert candidates into IndexedDB to trigger processing
     for (const candidate of config.candidates) {
@@ -252,13 +273,7 @@ ${jdContent}
     
     if (completedCount + failedCount >= taskMetadata.progress.totalCandidates) {
       taskMetadata.status = 'completed';
-      // Remove from active queue
-      await new Promise((resolve) => {
-        chrome.storage.local.get('active_task_queue', (result) => {
-          const queue = result.active_task_queue || [];
-          chrome.storage.local.set({ 'active_task_queue': queue.filter(id => id !== taskId) }, resolve);
-        });
-      });
+      // Task completed, derived naturally by status
     }
     
     await new Promise(resolve => chrome.storage.local.set({ [`task_metadata_${taskId}`]: taskMetadata }, resolve));
@@ -272,26 +287,21 @@ ${jdContent}
 
   async processStalledCandidates() {
     console.log('💓 Pipeline heartbeat: Checking for stalled candidates...');
-    await new Promise((resolve) => {
-      chrome.storage.local.get('active_task_queue', async (result) => {
-        const activeTasks = result.active_task_queue || [];
-        for (const taskId of activeTasks) {
-          const stalledCandidates = await dbManager.getStalledCandidates(taskId);
-          for (const candidate of stalledCandidates) {
-            // Force-clear the lock so processQueue doesn't ignore it
-            await dbManager.updateCandidateRecord(taskId, candidate.candidateId, {
-              currentWorker: null,
-              workerLockTime: null,
-              lastError: `Recovered from stall (${candidate.currentWorker || 'unknown'})`
-            });
-            // Fetch updated record to enqueue
-            const updated = await dbManager.getCandidateById(taskId, candidate.candidateId);
-            this.enqueueCandidate(taskId, updated);
-          }
-        }
-        resolve();
-      });
-    });
+    const activeTasks = await this.getActiveTasks();
+    for (const taskId of activeTasks) {
+      const stalledCandidates = await dbManager.getStalledCandidates(taskId);
+      for (const candidate of stalledCandidates) {
+        // Force-clear the lock so processQueue doesn't ignore it
+        await dbManager.updateCandidateRecord(taskId, candidate.candidateId, {
+          currentWorker: null,
+          workerLockTime: null,
+          lastError: `Recovered from stall (${candidate.currentWorker || 'unknown'})`
+        });
+        // Fetch updated record to enqueue
+        const updated = await dbManager.getCandidateById(taskId, candidate.candidateId);
+        this.enqueueCandidate(taskId, updated);
+      }
+    }
   }
 
   async cancelTask(taskId, reason) {
@@ -302,13 +312,7 @@ ${jdContent}
       metadata.cancelReason = reason;
       await new Promise(resolve => chrome.storage.local.set({ [`task_metadata_${taskId}`]: metadata }, resolve));
       
-      // Remove from active queue
-      await new Promise((resolve) => {
-        chrome.storage.local.get('active_task_queue', (result) => {
-          const queue = result.active_task_queue || [];
-          chrome.storage.local.set({ 'active_task_queue': queue.filter(id => id !== taskId) }, resolve);
-        });
-      });
+      // Task cancelled, derived naturally by status
     }
   }
 

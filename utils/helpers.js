@@ -8,25 +8,13 @@ export async function getTaskMetadata(taskId) {
 
 export async function getActiveTasks() {
   return new Promise((resolve) => {
-    chrome.storage.local.get('active_task_queue', async (result) => {
-      const queue = result.active_task_queue || [];
-      if (queue.length === 0) {
-        return resolve([]);
-      }
-      
+    chrome.storage.local.get(null, (items) => {
       const activeIds = [];
-      for (const taskId of queue) {
-        const metadata = await getTaskMetadata(taskId);
-        if (metadata && metadata.status !== 'cancelled' && metadata.status !== 'completed' && metadata.status !== 'completed_with_errors') {
-          activeIds.push(taskId);
+      for (const [key, value] of Object.entries(items)) {
+        if (key.startsWith('task_metadata_') && value && value.status === 'running') {
+          activeIds.push(value.taskId);
         }
       }
-      
-      // Cleanup if any were stale
-      if (activeIds.length !== queue.length) {
-        chrome.storage.local.set({ 'active_task_queue': activeIds });
-      }
-      
       resolve(activeIds);
     });
   });

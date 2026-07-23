@@ -137,14 +137,13 @@ export class KekaAPIClient {
       if (pageNumber > 20) break;
     }
 
-    // Temporarily disable stage filtering so all candidates populate
-    // if (stage) {
-    //    const matchStage = stage.toLowerCase();
-    //    return allCandidates.filter(c => {
-    //      const fields = [c.stage, c.status, c.stageTitle, c.statusTitle, c.currentStage, c.step];
-    //      return fields.some(f => typeof f === 'string' && f.toLowerCase().includes(matchStage));
-    //    });
-    // }
+    // Sort candidates by application date (newest first) to match Keka UI
+    allCandidates.sort((a, b) => {
+      const timeA = parseFloat(a.jobApplicationDetails?.appliedOn || 0);
+      const timeB = parseFloat(b.jobApplicationDetails?.appliedOn || 0);
+      return timeB - timeA;
+    });
+
     return allCandidates;
   }
 

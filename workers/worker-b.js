@@ -32,7 +32,7 @@ export class WorkerB extends BaseWorker {
         const parsedText = await ResumeParser.parse(rawResume.data, rawResume.contentType);
         
         if (!parsedText || parsedText.length < 10) {
-          throw new Error('Insufficient content parsed');
+          throw new Error('Insufficient text content parsed. The resume might be an image-only PDF without a text layer, or the file is corrupted.');
         }
         
         await dbManager.updateCandidateRecord(taskId, c.candidateId, {

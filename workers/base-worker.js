@@ -62,12 +62,15 @@ export class BaseWorker {
         workerLockTime: null
       });
     } else {
+      // 10 second backoff for retries to prevent instant failure looping
+      const backoffMs = 10000;
       await dbManager.updateCandidateRecord(taskId, candidateId, {
         retryCount: newRetryCount,
         lastError: `${errorPrefix} (retry ${newRetryCount}/3): ${error.message}`,
         currentWorker: null,
         workerLockTime: null,
-        status: 'pending' // Usually 'pending' restarts the pipeline, but we should make it configurable if needed. For now, matching old logic.
+        status: 'pending', // Usually 'pending' restarts the pipeline, but we should make it configurable if needed. For now, matching old logic.
+        nextRetryAfter: Date.now() + backoffMs
       });
     }
   }

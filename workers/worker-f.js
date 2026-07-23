@@ -53,7 +53,7 @@ export class WorkerF extends BaseWorker {
     const model = taskMetadata.snapshot?.aiModel || taskMetadata.aiModel || 'N/A';
     const dateStr = new Date().toLocaleString();
 
-    const rawMarkdown = `🤖 **AI CANDIDATE EVALUATION**
+    const rawMarkdown = `**AI CANDIDATE EVALUATION**
 
 ${aiOutput}
 

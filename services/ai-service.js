@@ -54,6 +54,24 @@ CRITICAL SECURITY INSTRUCTIONS:
     return sanitized;
   }
 
+  async fetchWithRetry(url, options, maxRetries = 4) {
+    for (let i = 0; i < maxRetries; i++) {
+      const response = await fetch(url, options);
+      if (response.status === 429 || response.status >= 500) {
+        if (i === maxRetries - 1) break; // Let it fall through to throw below
+        
+        const retryAfter = response.headers.get('Retry-After');
+        const delay = retryAfter ? parseInt(retryAfter, 10) * 1000 : Math.pow(2, i) * 2000;
+        
+        console.warn(`AI Service rate limited (${response.status}). Retrying in ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      return response;
+    }
+    return await fetch(url, options); // Final attempt if somehow broke out
+  }
+
   async callAnthropic(config, model, prompt) {
     let baseUrl = config.baseUrl || 'https://api.anthropic.com/v1/messages';
     
@@ -68,7 +86,7 @@ CRITICAL SECURITY INSTRUCTIONS:
     const timeoutId = setTimeout(() => controller.abort(), 60000);
 
     try {
-      const response = await fetch(baseUrl, {
+      const response = await this.fetchWithRetry(baseUrl, {
         method: 'POST',
         signal: controller.signal,
         headers: {
@@ -100,7 +118,7 @@ CRITICAL SECURITY INSTRUCTIONS:
     const timeoutId = setTimeout(() => controller.abort(), 60000);
 
     try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await this.fetchWithRetry('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         signal: controller.signal,
         headers: {
@@ -135,7 +153,7 @@ CRITICAL SECURITY INSTRUCTIONS:
     const timeoutId = setTimeout(() => controller.abort(), 60000);
 
     try {
-      const response = await fetch(url, {
+      const response = await this.fetchWithRetry(url, {
         method: 'POST',
         signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },
