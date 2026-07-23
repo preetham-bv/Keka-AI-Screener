@@ -135,7 +135,7 @@ export class ResumeParser {
       target: 'offscreen',
       type: 'parsePdf',
       candidateId: candidateId
-    }, 300000); // 5 minute timeout for PDF parsing
+    }, 120000); // 2 minute timeout for PDF parsing
 
     if (response && response.success) {
       return response.text;

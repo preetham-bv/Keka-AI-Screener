@@ -67,6 +67,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function handleParsePdf(candidateId) {
+  let keepAliveInterval = null;
   try {
     await ensureDb();
     const rawResume = await dbManager.getRawResume(candidateId);
@@ -74,9 +75,14 @@ async function handleParsePdf(candidateId) {
       throw new Error(`Raw resume not found in DB for candidate ${candidateId}`);
     }
 
-    const dataBuffer = rawResume.data; // ArrayBuffer from DB
-    const bytes = new Uint8Array(dataBuffer);
+    const bytes = new Uint8Array(rawResume.data);
     
+    // Start a keep-alive interval to prevent the Service Worker from dying 
+    // during long OCR tasks (Chrome kills idle SWs after 30s)
+    keepAliveInterval = setInterval(() => {
+      chrome.runtime.sendMessage({ type: 'offscreen_keepAlive', candidateId });
+    }, 15000);
+
     const loadingTask = pdfjsLib.getDocument({ data: bytes });
     const pdf = await loadingTask.promise;
     let fullText = '';
@@ -85,7 +91,18 @@ async function handleParsePdf(candidateId) {
 
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
+      let textContent;
+      try {
+        // Timeout getTextContent after 10 seconds. Malformed fonts in resume builders can cause infinite loops here.
+        textContent = await Promise.race([
+          page.getTextContent(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('getTextContent timeout')), 10000))
+        ]);
+      } catch (err) {
+        console.warn('getTextContent failed or timed out:', err);
+        textContent = { items: [] }; // Fallback to OCR if text extraction hangs
+      }
+      
       const pageText = textContent.items.map(item => item.str).join(' ');
 
       if (pageText.trim().length < 20) {
@@ -96,17 +113,65 @@ async function handleParsePdf(candidateId) {
         canvas.height = viewport.height;
         const context = canvas.getContext('2d');
         
-        await page.render({
+        const renderTask = page.render({
           canvasContext: context,
           viewport: viewport
-        }).promise;
+        });
+
+        // Timeout page.render after 30 seconds to prevent hangs on complex vectors (Canva resumes)
+        try {
+          await Promise.race([
+            renderTask.promise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('page.render timeout')), 30000))
+          ]);
+        } catch (err) {
+          console.warn('page.render failed or timed out:', err);
+          renderTask.cancel();
+          page.cleanup();
+          pagePromises.push(Promise.resolve(''));
+          continue; // Skip OCR for this page if render fails
+        }
+
+        // Check if canvas is completely blank (solid color) to skip OCR on empty pages
+        let isBlank = true;
+        try {
+          const pixelBuffer = new Uint32Array(context.getImageData(0, 0, canvas.width, canvas.height).data.buffer);
+          if (pixelBuffer.length > 0) {
+            const firstPixel = pixelBuffer[0];
+            for (let p = 1; p < pixelBuffer.length; p+=100) { // Check every 100th pixel for speed
+              if (pixelBuffer[p] !== firstPixel) {
+                isBlank = false;
+                break;
+              }
+            }
+          }
+        } catch (e) {
+          // Ignore ImageData errors (e.g., tainted canvas, though shouldn't happen here)
+          isBlank = false; 
+        }
+
+        if (isBlank) {
+          console.log('Skipping OCR for blank page.');
+          page.cleanup();
+          pagePromises.push(Promise.resolve(''));
+          continue;
+        }
 
         // Use JPEG to drastically reduce dataUrl string size and memory
         const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
         
-        // Queue the OCR job but DO NOT await it yet!
-        const ocrPromise = handleRecognizeImage(dataUrl);
-        pagePromises.push(ocrPromise);
+        // AWAIT the OCR job sequentially to prevent OOM crashes on large PDFs!
+        try {
+          // Timeout Tesseract after 45 seconds per page
+          const ocrText = await Promise.race([
+            handleRecognizeImage(dataUrl),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Tesseract timeout')), 45000))
+          ]);
+          pagePromises.push(Promise.resolve(ocrText));
+        } catch (err) {
+          console.warn('OCR failed or timed out:', err);
+          pagePromises.push(Promise.resolve(''));
+        }
         
         // Clean up
         page.cleanup();
@@ -126,8 +191,10 @@ async function handleParsePdf(candidateId) {
       throw new Error("Insufficient text content parsed.");
     }
 
+    clearInterval(keepAliveInterval);
     return fullText;
   } catch (error) {
+    clearInterval(keepAliveInterval);
     const errorDetails = typeof error === 'object' ? JSON.stringify(error, Object.getOwnPropertyNames(error)) : error;
     console.error('Error during PDF parsing in offscreen document:', error, errorDetails);
     throw error;

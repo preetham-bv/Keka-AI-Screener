@@ -104,7 +104,7 @@ export class StateOrchestrator {
              
              // Skip if completed or fully failed/posted
              if (['completed', 'failed', 'posted'].includes(candidate.status) && !candidate.nextAction) continue;
-             if (candidate.status !== 'pending' && !candidate.nextAction) continue;
+             // Allow all other states to be routed to their respective workers by routeCandidateToWorker
              
              // Enforce retry backoff delay
              if (candidate.nextRetryAfter && Date.now() < candidate.nextRetryAfter) continue;
