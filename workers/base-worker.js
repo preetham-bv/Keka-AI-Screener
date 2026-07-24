@@ -81,7 +81,7 @@ export class BaseWorker {
           await services.kekaAPI.postCandidateNote(
             jobId, 
             candidateId, 
-            "", 
+            "Resume parsing failed due to complex formatting or missing text. Manual review required.", 
             ["AI Screening Failed"]
           );
           console.log(`Successfully tagged candidate ${candidateId} as AI Screening Failed in Keka`);

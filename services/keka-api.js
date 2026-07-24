@@ -190,11 +190,15 @@ export class KekaAPIClient {
 
       let result = await doRequest(tags);
 
-      // Handle 400 Bad Request if Keka requires a comment text to attach a tag
-      if (!result.ok && result.status === 400 && !noteContent) {
-        console.warn(`Empty comment rejected by Keka API for candidate ${candidateId}. Retrying with a space...`);
-        noteContent = " ";
-        result = await doRequest(tags);
+      // Handle 400 Bad Request if Keka rejects empty comments OR rejects the tag because it doesn't exist
+      if (!result.ok && result.status === 400) {
+        console.warn(`400 Bad Request from Keka API for candidate ${candidateId}. Retrying with fallback...`);
+        // If we didn't have a note, add a placeholder
+        if (!noteContent || noteContent.trim() === "") {
+          noteContent = "Manual review required.";
+        }
+        // Try again without tags first, in case the tag "AI Screening Failed" doesn't exist in Keka settings
+        result = await doRequest([]);
       }
 
       // Handle 409 Tag Validation Error by retrying without tags
