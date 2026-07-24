@@ -58,7 +58,9 @@ export class BaseWorker {
       error.message.includes('Insufficient text content parsed') ||
       error.message.includes('password protected') ||
       error.message.includes('Invalid PDF structure') ||
-      error.message.includes('timed out after')
+      error.message.includes('timed out after') ||
+      error.message.includes('Unknown PDF parsing error') ||
+      error.message.includes('PDF parsing failed')
     );
     
     const newRetryCount = isFatal ? 3 : (candidate.retryCount || 0) + 1;
