@@ -1,6 +1,6 @@
 {
   "name": "keka-ats-extension",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Keka ATS AI Reviewer Extension",
   "scripts": {
     "build": "webpack --mode production --config webpack.config.js",
