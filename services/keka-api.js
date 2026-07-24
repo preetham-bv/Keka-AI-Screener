@@ -168,7 +168,8 @@ export class KekaAPIClient {
     await this.rateLimiter.acquire();
     try {
       const doRequest = async (requestTags) => {
-        const body = { comments: noteContent };
+        const body = {};
+        if (noteContent) body.comments = noteContent;
         if (requestTags && requestTags.length > 0) {
           body.tags = requestTags;
         }
@@ -188,6 +189,13 @@ export class KekaAPIClient {
       };
 
       let result = await doRequest(tags);
+
+      // Handle 400 Bad Request if Keka requires a comment text to attach a tag
+      if (!result.ok && result.status === 400 && !noteContent) {
+        console.warn(`Empty comment rejected by Keka API for candidate ${candidateId}. Retrying with a space...`);
+        noteContent = " ";
+        result = await doRequest(tags);
+      }
 
       // Handle 409 Tag Validation Error by retrying without tags
       if (!result.ok && result.status === 409 && result.errorText.includes('already exist')) {
