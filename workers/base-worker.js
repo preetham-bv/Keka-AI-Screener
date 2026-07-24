@@ -63,32 +63,24 @@ export class BaseWorker {
     const newRetryCount = isFatal ? 3 : (candidate.retryCount || 0) + 1;
     
     if (newRetryCount >= 3) {
-      await dbManager.updateCandidateRecord(taskId, candidateId, {
+      const updates = {
         status: 'failed',
         lastError: `${errorPrefix}: ${error.message}`,
         retryCount: newRetryCount,
         currentWorker: null,
         workerLockTime: null,
         nextAction: null
-      });
+      };
 
-      // Attempt to tag the candidate in Keka as AI Screening Failed
-      if (isFatal && services.kekaAPI) {
-        try {
-          const taskMetadata = await getTaskMetadata(taskId);
-          const jobId = taskMetadata?.snapshot?.kekaJobId || taskMetadata?.kekaJobId || taskId;
-          
-          await services.kekaAPI.postCandidateNote(
-            jobId, 
-            candidateId, 
-            "Resume parsing failed due to complex formatting or missing text. Manual review required.", 
-            ["AI Screening Failed"]
-          );
-          console.log(`Successfully tagged candidate ${candidateId} as AI Screening Failed in Keka`);
-        } catch (apiError) {
-          console.error(`Failed to post failure tag to Keka for candidate ${candidateId}:`, apiError);
-        }
+      if (isFatal) {
+        // Route fatal errors directly to WorkerF to post the failure tag to Keka
+        updates.nextAction = 'post_to_keka';
+        updates.aiEvaluationOutput = 'Resume parsing failed due to complex formatting or missing text. Manual review required.';
+        updates.tags = ['AI Screening Failed'];
+        console.log(`Routing fatal error for candidate ${candidateId} to WorkerF for Keka tagging`);
       }
+
+      await dbManager.updateCandidateRecord(taskId, candidateId, updates);
     } else {
       // 10 second backoff for retries to prevent instant failure looping
       const backoffMs = 10000;
