@@ -57,7 +57,8 @@ export class BaseWorker {
     const isFatal = error.message && (
       error.message.includes('Insufficient text content parsed') ||
       error.message.includes('password protected') ||
-      error.message.includes('Invalid PDF structure')
+      error.message.includes('Invalid PDF structure') ||
+      error.message.includes('timed out after')
     );
     
     const newRetryCount = isFatal ? 3 : (candidate.retryCount || 0) + 1;
